@@ -1,0 +1,80 @@
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <errno.h>
+#include <sys/shm.h>
+#include <string.h>
+#include <sys/sem.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <math.h>
+
+#define IPC_SIZE 512
+#define IPC_id 77
+#define serwerGotowy 98
+#define graczGotowy 99
+#define SHM_id 100
+#define SHM_SIZE 128
+#define sygnalGracz1 1
+#define sygnalGracz2 2
+#define sygnalGracz3 3
+#define sygnalSerwer 20
+
+typedef struct Wiadomosc{ //Message
+    long mtype;
+    char mtext[IPC_SIZE/2];
+    int mnum;
+}Wiadomosc;
+
+typedef struct Walka{
+    long mtype;
+    int units[3];
+}Walka;
+
+struct Wiadomosc msg;
+int IPC_ID;
+
+void wyslijWiadomosc(int signal, char text[IPC_SIZE], int num){
+    msg.mtype = signal;
+    strcpy(msg.mtext,text);
+    msg.mnum = num;
+    msgsnd(IPC_ID,&msg,IPC_SIZE,0);
+}
+
+int main()
+{
+    printf("----------------------\n");
+    printf("        Klient        \n");
+    printf("----------------------\n");
+
+//-----INICJACJA    
+    IPC_ID = msgget(IPC_id,IPC_CREAT|0600);
+    int idGracza = 0;
+    char nazwaGracza[IPC_SIZE]="";
+    printf("%d\n",IPC_ID);
+
+//-----LOGOWANIE
+    printf("Podaj nazwe gracza: ");
+    scanf("%s", &nazwaGracza[0]);
+    char czyStart[IPC_SIZE]="";
+    while(strcmp(czyStart,"start")!=0){
+        printf("Wpisz start aby zaczac: ");
+        scanf("%s",&czyStart[0]);
+    }
+    wyslijWiadomosc(graczGotowy,nazwaGracza,1);
+    printf("Czekam na serwer\n");
+    msgrcv(IPC_ID,&msg,IPC_SIZE,serwerGotowy,0);
+    //wyslijWiadomosc(graczGotowy,"1",1);
+    printf("Polaczono\n");
+
+//-----
+    printf("%d\n",idGracza);
+    msgrcv(IPC_ID,&msg,IPC_SIZE,sygnalSerwer,0);
+    idGracza = msg.mnum;
+    printf("Jestes graczem nr %d\n",idGracza);
+
+}

@@ -1,0 +1,111 @@
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <errno.h>
+#include <sys/shm.h>
+#include <string.h>
+#include <sys/sem.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <math.h>
+
+#define IPC_SIZE 512
+#define IPC_id 77
+#define serwerGotowy 98
+#define graczGotowy 99
+#define SHM_id 100
+#define SHM_SIZE 128
+#define sygnalGracz1 1
+#define sygnalGracz2 2
+#define sygnalGracz3 3
+#define sygnalSerwer 20
+
+typedef struct Wiadomosc{ //Message
+    long mtype;
+    char mtext[IPC_SIZE/2];
+    int mnum;
+}Wiadomosc;
+
+typedef struct Walka{
+    long mtype;
+    int units[3];
+}Walka;
+
+struct Wiadomosc msg;
+static struct sembuf buf;
+int IPC_ID;
+int IPC_gracz1;
+//int IPC_gracz2;
+//int IPC_gracz3;
+
+void wyslijWiadomosc(int signal, char text[IPC_SIZE], int num){
+    msg.mtype = signal;
+    strcpy(msg.mtext,text);
+    msg.mnum = num;
+    msgsnd(IPC_ID,&msg,IPC_SIZE,0);
+}
+
+void podniesSem(int semid, int semnum){
+    buf.sem_num = semnum;
+    buf.sem_op = 1;
+    buf.sem_flg = 0;
+}
+
+void opuscSem(int semid, int semnum){
+    buf.sem_num = semnum;
+    buf.sem_op = -1;
+    buf.sem_flg = 0;
+}
+
+int main()
+{
+    printf("----------------------\n");
+    printf("        Serwer        \n");
+    printf("----------------------\n");
+
+//-----INICJACJA
+    IPC_ID = msgget(IPC_id,IPC_CREAT|0600);
+    IPC_gracz1 = msgget(IPC_id+1,IPC_CREAT|0600);
+    //IPC_gracz2 = msgget(IPC_id+2,IPC_CREAT|0600);
+    //IPC_gracz3 = msgget(IPC_id+3,IPC_CREAT|0600);
+    wyslijWiadomosc(serwerGotowy,"1",1);
+    printf("Serwer gotowy %d %d\n",IPC_ID,IPC_gracz1);
+
+//-----SEMAFORY
+    int semid = semget(555,1,IPC_CREAT|0600); //3
+    semctl(semid,0,SETVAL,0);
+    //semctl(semid,1,SETVAL,0);
+    //semctl(semid,2,SETVAL,0);
+    opuscSem(semid,0);
+    //opuscSem(semid,1);
+    //opuscSem(semid,2);
+
+//-----LOGOWANIE GRACZY
+    int nazwaGracza1SH = shmget(SHM_id+1,SHM_SIZE,IPC_CREAT|0666);
+    char* nazwaGracza1 = shmat(nazwaGracza1SH,NULL,0);
+    //int nazwaGracza2SH = shmget(SHM_id+3,SHM_SIZE,IPC_CREAT|0666);
+    //char* nazwaGracza2 = shmat(nazwaGracza2SH,NULL,0);
+    //int nazwaGracza3SH = shmget(SHM_id+3,SHM_SIZE,IPC_CREAT|0666);
+    //char* nazwaGracza3 = shmat(nazwaGracza3SH,NULL,0);
+    podniesSem(semid,0);
+    //podniesSem(semid,1);
+    //podniesSem(semid,2);
+    printf("Czekam na graczy\n");
+
+    msgrcv(IPC_ID,&msg,IPC_SIZE,graczGotowy,0);
+    //opuscSem(semid,0);
+    strcpy(nazwaGracza1,msg.mtext);
+    printf("Dolaczyl gracz %s\n", nazwaGracza1);
+    //podniesSem(semid,0);
+    wyslijWiadomosc(sygnalSerwer,"1",sygnalGracz1); //id gracza
+    //msgrcv(IPC_ID,&msg,IPC_SIZE,graczGotowy,0);
+
+//-----
+    //printf("Zakonczono logowanie\n");
+    //wyslijWiadomosc(sygnalSerwer,"wszyscy",0);
+
+}
